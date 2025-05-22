@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2196f3">
+    <title>FinTrack - Transakcje</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/transactions.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="images/icons/icon-192x192.png">
+</head>
+<body>
+    <header>
+        <h1>FinTrack</h1>
+        <div class="user-info">
+            <span id="user-name">Użytkownik</span>
+            <button id="logout-btn" class="btn-logout">Wyloguj</button>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="index.html">Pulpit</a></li>
+                <li><a href="transactions.html" class="active">Transakcje</a></li>
+                <li><a href="analytics.html">Analityka</a></li>
+            </ul>
+        </nav>
+    </header>
+    
+    <main>
+        <section class="transaction-form-container">
+            <h2>Dodaj nową transakcję</h2>
+            <form id="transaction-form">
+                <div class="form-group">
+                    <label for="transaction-amount">Kwota</label>
+                    <input type="number" id="transaction-amount" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="transaction-type">Typ</label>
+                    <select id="transaction-type" required>
+                        <option value="expense">Wydatek</option>
+                        <option value="income">Przychód</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="transaction-category">Kategoria</label>
+                    <select id="transaction-category" required>
+                        <option value="food">Jedzenie</option>
+                        <option value="transport">Transport</option>
+                        <option value="entertainment">Rozrywka</option>
+                        <option value="housing">Mieszkanie</option>
+                        <option value="utilities">Rachunki</option>
+                        <option value="health">Zdrowie</option>
+                        <option value="education">Edukacja</option>
+                        <option value="salary">Wynagrodzenie</option>
+                        <option value="other">Inne</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="transaction-date">Data</label>
+                    <input type="date" id="transaction-date" required>
+                </div>
+                <div class="form-group">
+                    <label for="transaction-description">Opis</label>
+                    <textarea id="transaction-description" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Zapisz transakcję</button>
+            </form>
+        </section>
+        
+        <section class="transaction-filters">
+            <h2>Filtruj transakcje</h2>
+            <div class="filter-container">
+                <div class="form-group">
+                    <label for="filter-type">Typ</label>
+                    <select id="filter-type">
+                        <option value="all">Wszystkie</option>
+                        <option value="expense">Wydatki</option>
+                        <option value="income">Przychody</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filter-category">Kategoria</label>
+                    <select id="filter-category">
+                        <option value="all">Wszystkie</option>
+                        <option value="food">Jedzenie</option>
+                        <option value="transport">Transport</option>
+                        <option value="entertainment">Rozrywka</option>
+                        <option value="housing">Mieszkanie</option>
+                        <option value="utilities">Rachunki</option>
+                        <option value="health">Zdrowie</option>
+                        <option value="education">Edukacja</option>
+                        <option value="salary">Wynagrodzenie</option>
+                        <option value="other">Inne</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filter-date-from">Od daty</label>
+                    <input type="date" id="filter-date-from">
+                </div>
+                <div class="form-group">
+                    <label for="filter-date-to">Do daty</label>
+                    <input type="date" id="filter-date-to">
+                </div>
+                <button id="apply-filters" class="btn">Zastosuj filtry</button>
+                <button id="clear-filters" class="btn">Wyczyść filtry</button>
+            </div>
+        </section>
+        
+        <section class="transactions-list-container">
+            <h2>Lista transakcji</h2>
+            <div class="transactions-table-container">
+                <table id="transactions-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Kategoria</th>
+                            <th>Opis</th>
+                            <th>Kwota</th>
+                            <th>Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactions-list">
+                        <!-- Tutaj będą dodawane transakcje przez JavaScript -->
+                    </tbody>
+                </table>
+                <div id="no-transactions" class="no-data-message" hidden>
+                    Brak transakcji spełniających kryteria wyszukiwania.
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/transactions.js"></script>
+    
+</body>
+</html>

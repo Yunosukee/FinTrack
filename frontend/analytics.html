@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2196f3">
+    <title>FinTrack - Analityka</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/analytics.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="images/icons/icon-192x192.png">
+</head>
+<body>
+    <header>
+        <h1>FinTrack</h1>
+        <div class="user-info">
+            <span id="user-name">Użytkownik</span>
+            <button id="logout-btn" class="btn-logout">Wyloguj</button>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="index.html">Pulpit</a></li>
+                <li><a href="transactions.html">Transakcje</a></li>
+                <li><a href="analytics.html" class="active">Analityka</a></li>
+            </ul>
+        </nav>
+    </header>
+    
+    <main>
+        <section class="date-filter">
+            <h2>Zakres czasowy analizy</h2>
+            <div class="filter-container">
+                <div class="form-group">
+                    <label for="period-select">Okres</label>
+                    <select id="period-select">
+                        <option value="month">Bieżący miesiąc</option>
+                        <option value="quarter">Bieżący kwartał</option>
+                        <option value="year">Bieżący rok</option>
+                        <option value="custom">Niestandardowy zakres</option>
+                    </select>
+                </div>
+                <div class="custom-range" id="custom-range" hidden>
+                    <div class="form-group">
+                        <label for="date-from">Od daty</label>
+                        <input type="date" id="date-from">
+                    </div>
+                    <div class="form-group">
+                        <label for="date-to">Do daty</label>
+                        <input type="date" id="date-to">
+                    </div>
+                </div>
+                <button id="apply-date-filter" class="btn">Zastosuj</button>
+            </div>
+        </section>
+        
+        <section class="summary-cards">
+            <div class="card income-card">
+                <h3>Przychody</h3>
+                <div class="amount" id="total-income">0,00 zł</div>
+            </div>
+            <div class="card expense-card">
+                <h3>Wydatki</h3>
+                <div class="amount" id="total-expense">0,00 zł</div>
+            </div>
+            <div class="card balance-card">
+                <h3>Saldo</h3>
+                <div class="amount" id="balance">0,00 zł</div>
+            </div>
+        </section>
+        
+        <section class="charts-container">
+            <div class="chart-card">
+                <h3>Wydatki według kategorii</h3>
+                <div class="chart-wrapper">
+                    <canvas id="expenses-by-category"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Trendy miesięczne</h3>
+                <div class="chart-wrapper">
+                    <canvas id="monthly-trends"></canvas>
+                </div>
+            </div>
+        </section>
+        
+        <section class="budget-analysis">
+            <h2>Analiza budżetu</h2>
+            <div class="budget-table-container">
+                <table id="budget-table">
+                    <thead>
+                        <tr>
+                            <th>Kategoria</th>
+                            <th>Budżet</th>
+                            <th>Wydatki</th>
+                            <th>Pozostało</th>
+                            <th>% Wykorzystania</th>
+                        </tr>
+                    </thead>
+                    <tbody id="budget-list">
+                        <!-- Tutaj będą dodawane dane budżetowe przez JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/transactions.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/analytics.js"></script>
+    
+</body>
+</html>

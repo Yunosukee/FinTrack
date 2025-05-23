@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2196f3">
+    <title>FinTrack - Ustawienia</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/settings.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="images/icons/icon-192x192.png">
+</head>
+<body>
+    <header>
+        <h1>FinTrack</h1>
+        <div class="user-info">
+            <span id="user-name">Użytkownik</span>
+            <button id="logout-btn" class="btn-logout">Wyloguj</button>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="index.html">Pulpit</a></li>
+                <li><a href="transactions.html">Transakcje</a></li>
+                <li><a href="analytics.html">Analityka</a></li>
+                <li><a href="settings.html" class="active">Ustawienia</a></li>
+            </ul>
+        </nav>
+    </header>
+    
+    <main>
+        <div class="settings-container">
+            <div class="settings-sidebar">
+                <ul class="settings-nav">
+                    <li><a href="#profile" class="active" data-tab="profile">Profil</a></li>
+                    <li><a href="#budgets" data-tab="budgets">Budżety</a></li>
+                    <li><a href="#notifications" data-tab="notifications">Powiadomienia</a></li>
+                </ul>
+            </div>
+            
+            <div class="settings-content">
+                <!-- Sekcja profilu -->
+                <section id="profile" class="settings-section active">
+                    <h2>Ustawienia profilu</h2>
+                    <form id="profile-form" class="settings-form">
+                        <div class="form-group">
+                            <label for="user-display-name">Imię i nazwisko</label>
+                            <input type="text" id="user-display-name" placeholder="Twoje imię i nazwisko">
+                        </div>
+                        <div class="form-group">
+                            <label for="user-email">Email</label>
+                            <input type="email" id="user-email" placeholder="Twój adres email" readonly>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Zapisz zmiany</button>
+                    </form>
+                    
+                    <h3>Zmiana hasła</h3>
+                    <form id="password-form" class="settings-form">
+                        <div class="form-group">
+                            <label for="current-password">Aktualne hasło</label>
+                            <input type="password" id="current-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-password">Nowe hasło</label>
+                            <input type="password" id="new-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-password">Potwierdź nowe hasło</label>
+                            <input type="password" id="confirm-password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Zmień hasło</button>
+                    </form>
+                </section>
+                
+                <!-- Sekcja budżetów -->
+                <section id="budgets" class="settings-section">
+                    <h2>Ustawienia budżetów</h2>
+                    <p class="section-description">Ustaw miesięczne limity wydatków dla poszczególnych kategorii.</p>
+                    
+                    <div class="budget-controls">
+                        <button id="add-budget-btn" class="btn">Dodaj nowy budżet</button>
+                    </div>
+                    
+                    <div class="budgets-list" id="budgets-list">
+                        <!-- Tutaj będą dodawane budżety przez JavaScript -->
+                    </div>
+                    
+                    <!-- Formularz dodawania/edycji budżetu -->
+                    <div id="budget-form-container" class="modal" hidden>
+                        <div class="modal-content">
+                            <span class="close-modal">&times;</span>
+                            <h3 id="budget-form-title">Dodaj nowy budżet</h3>
+                            <form id="budget-form" class="settings-form">
+                                <input type="hidden" id="budget-id">
+                                <div class="form-group">
+                                    <label for="budget-category">Kategoria</label>
+                                    <select id="budget-category" required>
+                                        <option value="food">Jedzenie</option>
+                                        <option value="transport">Transport</option>
+                                        <option value="entertainment">Rozrywka</option>
+                                        <option value="housing">Mieszkanie</option>
+                                        <option value="utilities">Rachunki</option>
+                                        <option value="health">Zdrowie</option>
+                                        <option value="education">Edukacja</option>
+                                        <option value="shopping">Zakupy</option>
+                                        <option value="other">Inne</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="budget-amount">Limit miesięczny</label>
+                                    <input type="number" id="budget-amount" min="0" step="0.01" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="budget-color">Kolor</label>
+                                    <input type="color" id="budget-color" value="#4CAF50">
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary">Zapisz budżet</button>
+                                    <button type="button" id="cancel-budget-btn" class="btn">Anuluj</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Sekcja powiadomień -->
+                <section id="notifications" class="settings-section">
+                    <h2>Ustawienia powiadomień</h2>
+                    <p class="section-description">Dostosuj, kiedy i jak chcesz otrzymywać powiadomienia.</p>
+                    
+                    <div class="notification-controls">
+                        <button id="add-notification-btn" class="btn">Dodaj nowe powiadomienie</button>
+                    </div>
+                    
+                    <div class="notifications-list" id="notifications-list">
+                        <!-- Tutaj będą dodawane powiadomienia przez JavaScript -->
+                    </div>
+                    
+                    <!-- Formularz dodawania/edycji powiadomienia -->
+                    <div id="notification-form-container" class="modal" hidden>
+                        <div class="modal-content">
+                            <span class="close-notification-modal">&times;</span>
+                            <h3 id="notification-form-title">Dodaj nowe powiadomienie</h3>
+                            <form id="notification-form" class="settings-form">
+                                <input type="hidden" id="notification-id">
+                                <div class="form-group">
+                                    <label for="notification-type">Typ powiadomienia</label>
+                                    <select id="notification-type" required>
+                                        <option value="budget">Budżet</option>
+                                        <option value="payment">Płatność</option>
+                                        <option value="report">Raport</option>
+                                        <option value="custom">Niestandardowe</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="notification-title">Tytuł</label>
+                                    <input type="text" id="notification-title" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="notification-message">Wiadomość</label>
+                                    <textarea id="notification-message" rows="3" required></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="notification-date">Data powiadomienia</label>
+                                    <input type="date" id="notification-date" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="notification-time">Godzina powiadomienia</label>
+                                    <input type="time" id="notification-time" required>
+                                </div>
+                                <div class="form-group checkbox-group">
+                                    <input type="checkbox" id="notification-repeat">
+                                    <label for="notification-repeat">Powtarzaj powiadomienie</label>
+                                </div>
+                                <div class="form-group" id="repeat-options" style="display: none;">
+                                    <label for="notification-frequency">Częstotliwość</label>
+                                    <select id="notification-frequency">
+                                        <option value="daily">Codziennie</option>
+                                        <option value="weekly">Co tydzień</option>
+                                        <option value="monthly">Co miesiąc</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="notification-color">Kolor</label>
+                                    <input type="color" id="notification-color" value="#2196F3">
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary">Zapisz powiadomienie</button>
+                                    <button type="button" id="cancel-notification-btn" class="btn">Anuluj</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="js/app.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/settings.js"></script>
+</body>
+</html>

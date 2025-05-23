@@ -6,19 +6,89 @@ const API_URL = 'http://localhost:3000/api';
 // Initialize the database
 export async function initDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('fintrackDB', 2); // Zwiększ wersję bazy danych
+    const request = indexedDB.open('fintrackDB', 3); // Zwiększ wersję bazy danych
     
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
-      console.log('Upgrading database to version', event.newVersion);
+      const oldVersion = event.oldVersion;
       
-      // Create transactions store if it doesn't exist
-      if (!db.objectStoreNames.contains('transactions')) {
-        console.log('Creating transactions store');
-        const store = db.createObjectStore('transactions', { keyPath: '_id', autoIncrement: true });
+      // Tworzenie magazynów obiektów, jeśli nie istnieją
+      if (oldVersion < 1) {
+        // Create transactions store if it doesn't exist
+        if (!db.objectStoreNames.contains('transactions')) {
+          const store = db.createObjectStore('transactions', { keyPath: '_id', autoIncrement: true });
+          store.createIndex('userId', 'userId', { unique: false });
+          store.createIndex('synced', 'synced', { unique: false });
+          store.createIndex('date', 'date', { unique: false });
+        }
+        
+        // Create budgets store if it doesn't exist
+        if (!db.objectStoreNames.contains('budgets')) {
+          const store = db.createObjectStore('budgets', { keyPath: '_id', autoIncrement: true });
+          store.createIndex('userId', 'userId', { unique: false });
+          store.createIndex('synced', 'synced', { unique: false });
+        }
+        
+        // Create delete queue store if it doesn't exist
+        if (!db.objectStoreNames.contains('deleteQueue')) {
+          const store = db.createObjectStore('deleteQueue', { keyPath: '_id', autoIncrement: true });
+          store.createIndex('type', 'type', { unique: false });
+          store.createIndex('timestamp', 'timestamp', { unique: false });
+          store.createIndex('itemId', 'itemId', { unique: false });
+        }
+      }
+      
+      // Dodaj magazyn powiadomień w wersji 3
+      if (oldVersion < 3) {
+        // Create notifications store if it doesn't exist
+        if (!db.objectStoreNames.contains('notifications')) {
+          const store = db.createObjectStore('notifications', { keyPath: '_id', autoIncrement: true });
+          store.createIndex('userId', 'userId', { unique: false });
+          store.createIndex('synced', 'synced', { unique: false });
+          store.createIndex('date', 'date', { unique: false });
+          store.createIndex('type', 'type', { unique: false });
+        }
+      }
+    };
+    
+    request.onsuccess = (event) => {
+      resolve(event.target.result);
+    };
+    
+    request.onerror = (event) => {
+      console.error('IndexedDB error:', event.target.error);
+      reject(event.target.error);
+    };
+  });
+}
+
+// Function to ensure database is properly upgraded
+export async function ensureDBUpgraded() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('fintrackDB', 3);
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      const oldVersion = event.oldVersion;
+      
+      console.log(`Upgrading database from version ${oldVersion} to version 3`);
+      
+      // Create budgets store if it doesn't exist
+      if (!db.objectStoreNames.contains('budgets')) {
+        console.log('Creating budgets store');
+        const store = db.createObjectStore('budgets', { keyPath: '_id', autoIncrement: true });
+        store.createIndex('userId', 'userId', { unique: false });
+        store.createIndex('synced', 'synced', { unique: false });
+      }
+      
+      // Create notifications store if it doesn't exist
+      if (!db.objectStoreNames.contains('notifications')) {
+        console.log('Creating notifications store');
+        const store = db.createObjectStore('notifications', { keyPath: '_id', autoIncrement: true });
         store.createIndex('userId', 'userId', { unique: false });
         store.createIndex('synced', 'synced', { unique: false });
         store.createIndex('date', 'date', { unique: false });
+        store.createIndex('type', 'type', { unique: false });
       }
       
       // Create delete queue store if it doesn't exist
@@ -27,26 +97,19 @@ export async function initDB() {
         const store = db.createObjectStore('deleteQueue', { keyPath: '_id', autoIncrement: true });
         store.createIndex('type', 'type', { unique: false });
         store.createIndex('timestamp', 'timestamp', { unique: false });
-        store.createIndex('itemId', 'itemId', { unique: false }); // Dodaj indeks dla itemId
-      } else {
-        // Sprawdź, czy indeks itemId istnieje, jeśli nie - dodaj go
-        const tx = event.target.transaction;
-        const store = tx.objectStore('deleteQueue');
-        
-        if (!store.indexNames.contains('itemId')) {
-          console.log('Adding itemId index to deleteQueue store');
-          store.createIndex('itemId', 'itemId', { unique: false });
-        }
+        store.createIndex('itemId', 'itemId', { unique: false });
       }
     };
     
     request.onsuccess = (event) => {
-      console.log('Database initialized successfully');
-      resolve(event.target.result);
+      const db = event.target.result;
+      console.log(`Database opened successfully. Version: ${db.version}`);
+      console.log(`Available object stores: ${Array.from(db.objectStoreNames).join(', ')}`);
+      resolve(db);
     };
     
     request.onerror = (event) => {
-      console.error('IndexedDB error:', event.target.error);
+      console.error('Error opening database:', event.target.error);
       reject(event.target.error);
     };
   });
@@ -92,7 +155,7 @@ export async function getAllTransactions(userId) {
             const store = tx.objectStore('transactions');
             const index = store.index('userId');
             
-            const request = index.getAll(parseInt(userId));
+            const request = index.getAll(userId);
             
             request.onsuccess = () => {
                 console.log(`Retrieved all transactions for user ${userId}`);
@@ -114,20 +177,17 @@ export async function getAllTransactions(userId) {
 export async function getRecentTransactions(userId, days = 30) {
     try {
         const db = await initDB();
-        
-        // Konwertuj userId na liczbę, jeśli to string
-        const userIdInt = parseInt(userId);
-        
+
         return new Promise((resolve, reject) => {
             const tx = db.transaction('transactions', 'readonly');
             const store = tx.objectStore('transactions');
             const index = store.index('userId');
             
-            const request = index.getAll(userIdInt);
+            const request = index.getAll(userId);
             
             request.onsuccess = () => {
                 const allTransactions = request.result;
-                console.log(`Retrieved ${allTransactions.length} transactions for user ${userIdInt}`);
+                console.log(`Retrieved ${allTransactions.length} transactions for user ${userId}`);
                 
                 // Filter for last X days
                 const cutoffDate = new Date();

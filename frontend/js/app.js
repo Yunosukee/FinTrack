@@ -87,7 +87,7 @@ async function checkUserSession() {
 }
 
 // Funkcja do ładowania danych użytkownika
-async function loadUserData() {
+export async function loadUserData() {
     try {
         const userId = localStorage.getItem('userId');
         if (!userId) {

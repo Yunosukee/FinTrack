@@ -119,12 +119,12 @@
 }
 
 /* Style dla kwot */
-.income-amount {
+.amount.income {
     color: #4CAF50;
     font-weight: 600;
 }
 
-.expense-amount {
+.amount.expense {
     color: #F44336;
     font-weight: 600;
 }
@@ -138,20 +138,30 @@
 }
 
 /* Styl dla wierszy transakcji */
-.income-row {
+.transaction-row.income {
     background-color: rgba(76, 175, 80, 0.05);
 }
 
-.expense-row {
+.transaction-row.expense {
     background-color: rgba(244, 67, 54, 0.05);
 }
 
-.income-row:hover {
+.transaction-row.income:hover {
     background-color: rgba(76, 175, 80, 0.1);
 }
 
-.expense-row:hover {
+.transaction-row.expense:hover {
     background-color: rgba(244, 67, 54, 0.1);
+}
+
+/* Styl dla niezesynchronizowanych transakcji */
+.transaction-row.not-synced {
+    border-left: 3px solid #FF9800;
+}
+
+.sync-status {
+    margin-left: 5px;
+    color: #FF9800;
 }
 
 /* Responsywność */
@@ -173,4 +183,33 @@
     .action-buttons {
         flex-direction: column;
     }
+}
+
+/* Przycisk synchronizacji */
+.btn-sync {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+.btn-sync:hover {
+    background-color: #0d8aee;
+}
+
+/* Wskaźnik trybu offline */
+.offline-indicator {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #FF9800;
+    color: white;
+    text-align: center;
+    padding: 10px;
+    font-weight: bold;
+    z-index: 1000;
 }

@@ -585,7 +585,7 @@ async function addNewTransaction(event) {
 
   // Przygotuj obiekt transakcji - używaj liczby dla amount, nie stringa
   const transaction = {
-    userId: parseInt(userId),
+    userId: userId,
     amount: parseFloat(amountInput), // Zapisz jako liczba, nie string
     description,
     category,

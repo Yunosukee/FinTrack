@@ -137,7 +137,7 @@ async function applyDateFilter() {
         console.log(`Zakres dat: ${startDate.toISOString()} - ${endDate.toISOString()}`);
         
         // Pobierz transakcje z ostatniego roku (maksymalny zakres)
-        const allTransactions = await getRecentTransactions(parseInt(userId), 365);
+        const allTransactions = await getRecentTransactions(userId, 365);
         
         // Filtruj transakcje na podstawie daty
         const filteredTransactions = allTransactions.filter(transaction => {

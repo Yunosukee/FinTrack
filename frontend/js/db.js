@@ -82,42 +82,73 @@ export async function addTransaction(transaction) {
     }
 }
 
-// Get recent transactions for a user
+// Dodaj tę funkcję, jeśli jeszcze nie istnieje
+export async function getAllTransactions(userId) {
+    try {
+        const db = await initDB();
+        
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('transactions', 'readonly');
+            const store = tx.objectStore('transactions');
+            const index = store.index('userId');
+            
+            const request = index.getAll(parseInt(userId));
+            
+            request.onsuccess = () => {
+                console.log(`Retrieved all transactions for user ${userId}`);
+                resolve(request.result);
+            };
+            
+            request.onerror = () => {
+                console.error('Error getting all transactions:', request.error);
+                reject(request.error);
+            };
+        });
+    } catch (error) {
+        console.error('Error in getAllTransactions:', error);
+        return [];
+    }
+}
+
+// Upewnij się, że ta funkcja obsługuje przypadek, gdy userId jest stringiem
 export async function getRecentTransactions(userId, days = 30) {
     try {
-      const db = await initDB();
-    
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction('transactions', 'readonly');
-        const store = tx.objectStore('transactions');
-        const index = store.index('userId');
-      
-        const request = index.getAll(userId);
-      
-        request.onsuccess = () => {
-          const allTransactions = request.result;
-          console.log(`Retrieved ${allTransactions.length} transactions for user ${userId}`);
+        const db = await initDB();
         
-          // Filter for last X days
-          const cutoffDate = new Date();
-          cutoffDate.setDate(cutoffDate.getDate() - days);
+        // Konwertuj userId na liczbę, jeśli to string
+        const userIdInt = parseInt(userId);
         
-          const recentTransactions = allTransactions.filter(t => 
-            new Date(t.date) >= cutoffDate
-          );
-        
-          console.log(`Filtered to ${recentTransactions.length} transactions in the last ${days} days`);
-          resolve(recentTransactions);
-        };
-      
-        request.onerror = () => {
-          console.error('Error getting transactions:', request.error);
-          reject(request.error);
-        };
-      });
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('transactions', 'readonly');
+            const store = tx.objectStore('transactions');
+            const index = store.index('userId');
+            
+            const request = index.getAll(userIdInt);
+            
+            request.onsuccess = () => {
+                const allTransactions = request.result;
+                console.log(`Retrieved ${allTransactions.length} transactions for user ${userIdInt}`);
+                
+                // Filter for last X days
+                const cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - days);
+                
+                const recentTransactions = allTransactions.filter(t => 
+                    new Date(t.date) >= cutoffDate
+                );
+                
+                console.log(`Filtered to ${recentTransactions.length} transactions in the last ${days} days`);
+                resolve(recentTransactions);
+            };
+            
+            request.onerror = () => {
+                console.error('Error getting transactions:', request.error);
+                reject(request.error);
+            };
+        });
     } catch (error) {
-      console.error('Error in getRecentTransactions:', error);
-      return [];
+        console.error('Error in getRecentTransactions:', error);
+        return [];
     }
 }
 

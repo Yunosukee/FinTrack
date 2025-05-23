@@ -106,9 +106,71 @@
 
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/auth.js"></script>
-    <script type="module" src="js/transactions.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="js/analytics.js"></script>
-    
+    <script type="module" src="js/charts.js"></script>
+    <script type="module">
+        import { initAnalyticsPage } from './js/charts.js';
+        import { checkLoginStatus } from './js/auth.js';
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Sprawdź status logowania
+            if (!checkLoginStatus()) {
+                window.location.href = '/login.html';
+                return;
+            }
+            
+            // Załaduj dane użytkownika
+            const userName = localStorage.getItem('userName') || 'Użytkownik';
+            const userNameElement = document.getElementById('user-name');
+            if (userNameElement) {
+                userNameElement.textContent = userName;
+            }
+            
+            // Obsługa wylogowania
+            const logoutBtn = document.getElementById('logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', () => {
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('userId');
+                    localStorage.removeItem('userName');
+                    localStorage.removeItem('userEmail');
+                    window.location.href = '/login.html';
+                });
+            }
+            
+            // Inicjalizuj stronę analityczną
+            await initAnalyticsPage();
+            
+            // Aktualizuj wskaźnik trybu offline
+            updateOfflineIndicator();
+            
+            // Nasłuchuj na zmiany stanu połączenia
+            window.addEventListener('online', updateOfflineIndicator);
+            window.addEventListener('offline', updateOfflineIndicator);
+        });
+        
+        // Funkcja do aktualizacji wskaźnika trybu offline
+        function updateOfflineIndicator() {
+            const offlineIndicator = document.getElementById('offline-indicator');
+            if (!offlineIndicator) {
+                // Jeśli nie istnieje, utwórz go
+                const header = document.querySelector('header');
+                if (header) {
+                    const indicator = document.createElement('div');
+                    indicator.id = 'offline-indicator';
+                    indicator.className = 'offline-indicator';
+                    indicator.innerHTML = 'Tryb offline - niektóre funkcje mogą być niedostępne';
+                    header.appendChild(indicator);
+                }
+            } else {
+                // Aktualizuj istniejący
+                if (navigator.onLine) {
+                    offlineIndicator.style.display = 'none';
+                } else {
+                    offlineIndicator.style.display = 'block';
+                }
+            }
+        }
+    </script>
 </body>
 </html>

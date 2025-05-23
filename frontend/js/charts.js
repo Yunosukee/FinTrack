@@ -1,35 +1,28 @@
+// Funkcje do tworzenia i zarządzania wykresami dla strony analityki
+import { getRecentTransactions, getCurrentBalance } from './db.js';
+import { isOnline } from './auth.js';
+
 // Globalne zmienne dla strony analityki
-let currentUser = null;
-let userTransactions = [];
 let charts = {};
+let currentPeriod = 'month'; // Domyślny okres to bieżący miesiąc
 
 // Inicjalizacja strony analitycznej
-function initAnalyticsPage(user) {
-    currentUser = user;
+export async function initAnalyticsPage() {
+    console.log('Inicjalizacja strony analitycznej...');
     
-    // Ustaw nazwę użytkownika w interfejsie
-    const userNameElement = document.getElementById('user-name');
-    if (userNameElement) {
-        userNameElement.textContent = user.name;
-    }
-    
-    // Pobierz transakcje użytkownika
-    loadUserTransactions();
-    
-    // Ustaw dzisiejszą datę jako domyślną dla filtrów niestandardowych
+    // Ustaw domyślną datę jako dzisiejszą dla filtrów niestandardowych
     setDefaultDates();
     
     // Dodaj event listenery
     setupEventListeners();
+    
+    // Pobierz transakcje i analizuj je
+    await loadAndAnalyzeTransactions();
 }
 
 // Ustawienie event listenerów
 function setupEventListeners() {
-    // Obsługa wylogowania
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', logout);
-    }
+    console.log('Konfiguracja event listenerów...');
     
     // Obsługa zmiany okresu
     const periodSelect = document.getElementById('period-select');
@@ -44,23 +37,9 @@ function setupEventListeners() {
     }
 }
 
-// Pobierz transakcje i analizuj je
-async function loadUserTransactions() {
-    try {
-        // Pobierz transakcje dla zalogowanego użytkownika
-        const transactions = await transactionDB.getAllForUser(currentUser.id);
-        userTransactions = transactions;
-        
-        // Zastosuj domyślny filtr (bieżący miesiąc)
-        applyDateFilter();
-    } catch (error) {
-        console.error('Błąd podczas ładowania transakcji:', error);
-        showNotification('Nie udało się załadować danych. Spróbuj ponownie później.', 'error');
-    }
-}
-
 // Ustaw domyślne daty dla filtrów niestandardowych
 function setDefaultDates() {
+    console.log('Ustawianie domyślnych dat...');
     const today = new Date();
     
     // Ustaw datę "do" na dzisiaj
@@ -79,82 +58,123 @@ function setDefaultDates() {
 
 // Obsługa zmiany okresu
 function handlePeriodChange() {
+    console.log('Zmiana okresu...');
     const periodSelect = document.getElementById('period-select');
     const customRange = document.getElementById('custom-range');
     
-    if (periodSelect.value === 'custom') {
-        customRange.removeAttribute('hidden');
-    } else {
-        customRange.setAttribute('hidden', true);
-        // Automatycznie zastosuj wybrany okres
-        applyDateFilter();
+    if (periodSelect) {
+        currentPeriod = periodSelect.value;
+        
+        if (currentPeriod === 'custom') {
+            if (customRange) customRange.removeAttribute('hidden');
+        } else {
+            if (customRange) customRange.setAttribute('hidden', true);
+            // Automatycznie zastosuj wybrany okres
+            applyDateFilter();
+        }
     }
 }
 
 // Zastosuj filtr daty i przeanalizuj dane
-function applyDateFilter() {
-    const periodSelect = document.getElementById('period-select');
-    let startDate, endDate;
-    const today = new Date();
-    
-    if (periodSelect.value === 'custom') {
-        // Użyj niestandardowego zakresu dat
-        const dateFromInput = document.getElementById('date-from');
-        const dateToInput = document.getElementById('date-to');
-        
-        if (dateFromInput.value) {
-            startDate = new Date(dateFromInput.value);
-            startDate.setHours(0, 0, 0, 0);
-        } else {
-            // Jeśli nie podano daty początkowej, użyj pierwszego dnia bieżącego miesiąca
-            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+async function applyDateFilter() {
+    console.log('Stosowanie filtru daty...');
+    try {
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+            console.error('Brak ID użytkownika');
+            return;
         }
         
-        if (dateToInput.value) {
-            endDate = new Date(dateToInput.value);
-            endDate.setHours(23, 59, 59, 999);
+        let startDate, endDate;
+        const today = new Date();
+        
+        if (currentPeriod === 'custom') {
+            // Użyj niestandardowego zakresu dat
+            const dateFromInput = document.getElementById('date-from');
+            const dateToInput = document.getElementById('date-to');
+            
+            if (dateFromInput && dateFromInput.value) {
+                startDate = new Date(dateFromInput.value);
+                startDate.setHours(0, 0, 0, 0);
+            } else {
+                // Jeśli nie podano daty początkowej, użyj pierwszego dnia bieżącego miesiąca
+                startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            }
+            
+            if (dateToInput && dateToInput.value) {
+                endDate = new Date(dateToInput.value);
+                endDate.setHours(23, 59, 59, 999);
+            } else {
+                // Jeśli nie podano daty końcowej, użyj dzisiejszej
+                endDate = new Date(today);
+                endDate.setHours(23, 59, 59, 999);
+            }
         } else {
-            // Jeśli nie podano daty końcowej, użyj dzisiejszej
+            // Użyj predefiniowanego zakresu
             endDate = new Date(today);
             endDate.setHours(23, 59, 59, 999);
+            
+            switch (currentPeriod) {
+                case 'month':
+                    // Bieżący miesiąc
+                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                    break;
+                case 'quarter':
+                    // Bieżący kwartał
+                    const quarter = Math.floor(today.getMonth() / 3);
+                    startDate = new Date(today.getFullYear(), quarter * 3, 1);
+                    break;
+                case 'year':
+                    // Bieżący rok
+                    startDate = new Date(today.getFullYear(), 0, 1);
+                    break;
+                default:
+                    // Domyślnie - bieżący miesiąc
+                    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            }
         }
-    } else {
-        // Użyj predefiniowanego zakresu
-        endDate = new Date(today);
-        endDate.setHours(23, 59, 59, 999);
         
-        switch (periodSelect.value) {
-            case 'month':
-                // Bieżący miesiąc
-                startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-                break;
-            case 'quarter':
-                // Bieżący kwartał
-                const quarter = Math.floor(today.getMonth() / 3);
-                startDate = new Date(today.getFullYear(), quarter * 3, 1);
-                break;
-            case 'year':
-                // Bieżący rok
-                startDate = new Date(today.getFullYear(), 0, 1);
-                break;
-            default:
-                // Domyślnie - bieżący miesiąc
-                startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-        }
+        console.log(`Zakres dat: ${startDate.toISOString()} - ${endDate.toISOString()}`);
+        
+        // Pobierz transakcje z ostatniego roku (maksymalny zakres)
+        const allTransactions = await getRecentTransactions(parseInt(userId), 365);
+        
+        // Filtruj transakcje na podstawie daty
+        const filteredTransactions = allTransactions.filter(transaction => {
+            const transactionDate = new Date(transaction.date);
+            return transactionDate >= startDate && transactionDate <= endDate;
+        });
+        
+        console.log(`Znaleziono ${filteredTransactions.length} transakcji w wybranym okresie`);
+        
+        // Analizuj dane i aktualizuj interfejs
+        analyzeTransactions(filteredTransactions);
+    } catch (error) {
+        console.error('Błąd podczas stosowania filtru daty:', error);
     }
-    
-    // Filtruj transakcje na podstawie daty
-    const filteredTransactions = userTransactions.filter(transaction => {
-        const transactionDate = new Date(transaction.date);
-        return transactionDate >= startDate && transactionDate <= endDate;
-    });
-    
-    // Analizuj dane i aktualizuj interfejs
-    analyzeTransactions(filteredTransactions, startDate, endDate);
+}
+
+// Pobierz transakcje i analizuj je
+async function loadAndAnalyzeTransactions() {
+    console.log('Ładowanie i analiza transakcji...');
+    try {
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+            console.error('Brak ID użytkownika');
+            return;
+        }
+        
+        // Zastosuj domyślny filtr (bieżący miesiąc)
+        await applyDateFilter();
+    } catch (error) {
+        console.error('Błąd podczas ładowania transakcji:', error);
+    }
 }
 
 // Analiza transakcji i aktualizacja interfejsu
-function analyzeTransactions(transactions, startDate, endDate) {
+function analyzeTransactions(transactions) {
+    console.log('Analiza transakcji...');
+    
     // Oblicz sumy dla przychodów i wydatków
     let totalIncome = 0;
     let totalExpense = 0;
@@ -166,16 +186,18 @@ function analyzeTransactions(transactions, startDate, endDate) {
     const monthlyData = {};
     
     transactions.forEach(transaction => {
+        const amount = parseFloat(transaction.amount);
+        
         if (transaction.type === 'income') {
-            totalIncome += parseFloat(transaction.amount);
-        } else {
-            totalExpense += parseFloat(transaction.amount);
+            totalIncome += amount;
+        } else if (transaction.type === 'expense') {
+            totalExpense += amount;
             
             // Dodaj do słownika kategorii
             if (!expensesByCategory[transaction.category]) {
                 expensesByCategory[transaction.category] = 0;
             }
-            expensesByCategory[transaction.category] += parseFloat(transaction.amount);
+            expensesByCategory[transaction.category] += amount;
         }
         
         // Dodaj do analizy miesięcznej
@@ -190,9 +212,9 @@ function analyzeTransactions(transactions, startDate, endDate) {
         }
         
         if (transaction.type === 'income') {
-            monthlyData[yearMonth].income += parseFloat(transaction.amount);
-        } else {
-            monthlyData[yearMonth].expense += parseFloat(transaction.amount);
+            monthlyData[yearMonth].income += amount;
+        } else if (transaction.type === 'expense') {
+            monthlyData[yearMonth].expense += amount;
         }
     });
     
@@ -212,6 +234,8 @@ function analyzeTransactions(transactions, startDate, endDate) {
 
 // Aktualizacja kart podsumowania
 function updateSummaryCards(totalIncome, totalExpense, balance) {
+    console.log('Aktualizacja kart podsumowania...');
+    
     // Format waluty
     const formatCurrency = new Intl.NumberFormat('pl-PL', {
         style: 'currency',
@@ -248,7 +272,12 @@ function updateSummaryCards(totalIncome, totalExpense, balance) {
 
 // Aktualizacja wykresu kategorii
 function updateCategoryChart(expensesByCategory) {
-    const ctx = document.getElementById('expenses-by-category').getContext('2d');
+    console.log('Aktualizacja wykresu kategorii...');
+    const ctx = document.getElementById('expenses-by-category');
+    if (!ctx) {
+        console.error('Nie znaleziono elementu canvas dla wykresu kategorii');
+        return;
+    }
     
     // Przygotuj dane do wykresu
     const categories = Object.keys(expensesByCategory);
@@ -264,6 +293,12 @@ function updateCategoryChart(expensesByCategory) {
     // Usuń poprzedni wykres, jeśli istnieje
     if (charts.categoryChart) {
         charts.categoryChart.destroy();
+    }
+    
+    if (categories.length === 0) {
+        // Brak danych do wyświetlenia
+        ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+        return;
     }
     
     // Stwórz nowy wykres
@@ -289,7 +324,7 @@ function updateCategoryChart(expensesByCategory) {
                             const value = context.raw;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
                             const percentage = Math.round((value / total) * 100);
-                            return `${getCategoryName(context.label)}: ${formatCurrency(value)} (${percentage}%)`;
+                            return `${context.label}: ${formatCurrency(value)} (${percentage}%)`;
                         }
                     }
                 }
@@ -301,7 +336,12 @@ function updateCategoryChart(expensesByCategory) {
 
 // Aktualizacja wykresu trendów miesięcznych
 function updateMonthlyTrendsChart(monthlyData) {
-    const ctx = document.getElementById('monthly-trends').getContext('2d');
+    console.log('Aktualizacja wykresu trendów miesięcznych...');
+    const ctx = document.getElementById('monthly-trends');
+    if (!ctx) {
+        console.error('Nie znaleziono elementu canvas dla wykresu trendów');
+        return;
+    }
     
     // Posortuj dane według miesięcy
     const sortedMonths = Object.keys(monthlyData).sort();
@@ -314,6 +354,12 @@ function updateMonthlyTrendsChart(monthlyData) {
     // Usuń poprzedni wykres, jeśli istnieje
     if (charts.monthlyChart) {
         charts.monthlyChart.destroy();
+    }
+    
+    if (sortedMonths.length === 0) {
+        // Brak danych do wyświetlenia
+        ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+        return;
     }
     
     // Stwórz nowy wykres
@@ -366,7 +412,12 @@ function updateMonthlyTrendsChart(monthlyData) {
 
 // Aktualizacja analizy budżetu
 function updateBudgetAnalysis(expensesByCategory) {
+    console.log('Aktualizacja analizy budżetu...');
     const budgetList = document.getElementById('budget-list');
+    if (!budgetList) {
+        console.error('Nie znaleziono elementu dla listy budżetu');
+        return;
+    }
     
     // Wyczyść aktualną listę
     budgetList.innerHTML = '';
@@ -382,7 +433,7 @@ function updateBudgetAnalysis(expensesByCategory) {
         'health': 400,
         'education': 300,
         'shopping': 500,
-        'other_expense': 300
+        'other': 300
     };
     
     // Dodaj wiersz dla każdej kategorii wydatków
@@ -416,6 +467,13 @@ function updateBudgetAnalysis(expensesByCategory) {
         
         budgetList.appendChild(row);
     });
+    
+    // Jeśli nie ma żadnych kategorii wydatków, wyświetl komunikat
+    if (Object.keys(expensesByCategory).length === 0) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = '<td colspan="5" class="no-data">Brak danych o wydatkach w wybranym okresie</td>';
+        budgetList.appendChild(emptyRow);
+    }
 }
 
 // Formatowanie etykiety miesiąca
@@ -446,7 +504,7 @@ function getCategoryName(categoryCode) {
         'health': 'Zdrowie',
         'education': 'Edukacja',
         'shopping': 'Zakupy',
-        'other_expense': 'Inne wydatki',
+        'other': 'Inne wydatki',
         
         // Przychody
         'salary': 'Wynagrodzenie',
@@ -460,37 +518,42 @@ function getCategoryName(categoryCode) {
     return categories[categoryCode] || categoryCode;
 }
 
-// Funkcja do wyświetlania powiadomień
-function showNotification(message, type = 'info') {
-    // Sprawdź, czy kontener powiadomień istnieje, jeśli nie - stwórz go
-    let notificationsContainer = document.getElementById('notifications-container');
-    
-    if (!notificationsContainer) {
-        notificationsContainer = document.createElement('div');
-        notificationsContainer.id = 'notifications-container';
-        document.body.appendChild(notificationsContainer);
-    }
-    
-    // Stwórz element powiadomienia
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    
-    // Dodaj przycisk zamknięcia
-    const closeButton = document.createElement('button');
-    closeButton.className = 'close-btn';
-    closeButton.innerHTML = '&times;';
-    closeButton.addEventListener('click', () => {
-        notification.remove();
+// Funkcja do sprawdzania, czy wykres Chart.js jest dostępny
+function isChartJsAvailable() {
+    return typeof Chart !== 'undefined';
+}
+
+// Funkcja do wyświetlania komunikatu o błędzie, jeśli Chart.js nie jest dostępny
+function showChartJsError() {
+    const chartContainers = document.querySelectorAll('.chart-wrapper');
+    chartContainers.forEach(container => {
+        container.innerHTML = '<div class="error-message">Nie można załadować biblioteki wykresów. Sprawdź połączenie z internetem.</div>';
     });
+}
+
+// Dodatkowa funkcja do obsługi błędów podczas ładowania danych
+function handleDataLoadError(error) {
+    console.error('Błąd podczas ładowania danych:', error);
     
-    notification.appendChild(closeButton);
-    
-    // Dodaj powiadomienie do kontenera
-    notificationsContainer.appendChild(notification);
-    
-    // Automatycznie usuń powiadomienie po 5 sekundach
-    setTimeout(() => {
-        notification.remove();
-    }, 5000);
+    // Wyświetl komunikat o błędzie w interfejsie
+    const main = document.querySelector('main');
+    if (main) {
+        const errorMessage = document.createElement('div');
+        errorMessage.className = 'error-message';
+        errorMessage.textContent = 'Wystąpił błąd podczas ładowania danych. Spróbuj odświeżyć stronę.';
+        
+        // Dodaj przycisk odświeżania
+        const refreshButton = document.createElement('button');
+        refreshButton.className = 'btn';
+        refreshButton.textContent = 'Odśwież stronę';
+        refreshButton.addEventListener('click', () => {
+            window.location.reload();
+        });
+        
+        errorMessage.appendChild(document.createElement('br'));
+        errorMessage.appendChild(refreshButton);
+        
+        // Dodaj na początku main
+        main.insertBefore(errorMessage, main.firstChild);
+    }
 }

@@ -13,6 +13,7 @@ const authRoutes = require('./routes/auth');
 const syncRoutes = require('./routes/sync');
 const apiRoutes = require('./routes/api');
 const usersRoutes = require('./routes/users');
+const transactionsRoutes = require('./routes/transactions');
 
 // Inicjalizacja aplikacji Express
 const app = express();
@@ -34,10 +35,12 @@ mongoose.connect(MONGODB_URI, MONGODB_OPTIONS)
   });
 
 // Routing API
+
 app.use('/api', apiRoutes); // Dodaj trasę dla newsów finansowych
 app.use('/api/auth', authRoutes);
 app.use('/api/sync', syncRoutes); // Endpointy do synchronizacji danych
 app.use('/api/users', usersRoutes); // Endpointy do zarządzania użytkownikami
+app.use('/api/transactions', transactionsRoutes); // Endpointy do zarządzania transakcjami
 
 
 // Obsługa błędów - middleware dla 404

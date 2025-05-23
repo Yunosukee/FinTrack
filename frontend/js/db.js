@@ -1,37 +1,47 @@
 import { isOnline } from './auth.js';
 
+// Bazowy URL API
+const API_URL = 'http://localhost:3000/api';
+
 // Initialize the database
 export async function initDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('fintrackDB', 1);
+    const request = indexedDB.open('fintrackDB', 2); // Zwiększ wersję bazy danych
     
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
+      console.log('Upgrading database to version', event.newVersion);
       
       // Create transactions store if it doesn't exist
       if (!db.objectStoreNames.contains('transactions')) {
+        console.log('Creating transactions store');
         const store = db.createObjectStore('transactions', { keyPath: '_id', autoIncrement: true });
         store.createIndex('userId', 'userId', { unique: false });
         store.createIndex('synced', 'synced', { unique: false });
         store.createIndex('date', 'date', { unique: false });
       }
       
-      // Create budgets store if it doesn't exist
-      if (!db.objectStoreNames.contains('budgets')) {
-        const store = db.createObjectStore('budgets', { keyPath: '_id', autoIncrement: true });
-        store.createIndex('userId', 'userId', { unique: false });
-        store.createIndex('synced', 'synced', { unique: false });
-      }
-      
       // Create delete queue store if it doesn't exist
       if (!db.objectStoreNames.contains('deleteQueue')) {
+        console.log('Creating deleteQueue store');
         const store = db.createObjectStore('deleteQueue', { keyPath: '_id', autoIncrement: true });
         store.createIndex('type', 'type', { unique: false });
         store.createIndex('timestamp', 'timestamp', { unique: false });
+        store.createIndex('itemId', 'itemId', { unique: false }); // Dodaj indeks dla itemId
+      } else {
+        // Sprawdź, czy indeks itemId istnieje, jeśli nie - dodaj go
+        const tx = event.target.transaction;
+        const store = tx.objectStore('deleteQueue');
+        
+        if (!store.indexNames.contains('itemId')) {
+          console.log('Adding itemId index to deleteQueue store');
+          store.createIndex('itemId', 'itemId', { unique: false });
+        }
       }
     };
     
     request.onsuccess = (event) => {
+      console.log('Database initialized successfully');
       resolve(event.target.result);
     };
     
@@ -199,7 +209,7 @@ export async function getCurrentBalance() {
       try {
         const token = localStorage.getItem('authToken');
         if (token) {
-          const response = await fetch('http://localhost:3000/api/users/balance', {
+          const response = await fetch(`${API_URL}/users/balance`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${token}`

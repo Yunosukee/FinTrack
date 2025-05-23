@@ -2,6 +2,9 @@ import { checkLoginStatus, isOnline } from "./auth.js";
 import { syncData } from "./api.js";
 import { addTransaction, getRecentTransactions, initDB, getCurrentBalance } from "./db.js";
 
+// Bazowy URL API
+const API_URL = 'http://localhost:3000/api';
+
 // Dodaj kontener na komunikaty, jeśli nie istnieje
 function addMessageContainer() {
   if (!document.getElementById('message-container')) {
@@ -17,6 +20,7 @@ function addMessageContainer() {
 
 // Funkcja do usuwania transakcji
 async function deleteTransaction(transactionId) {
+  console.log('Rozpoczynam usuwanie transakcji o ID:', transactionId);
   try {
     const userId = localStorage.getItem('userId');
     if (!userId) {
@@ -24,30 +28,77 @@ async function deleteTransaction(transactionId) {
       return false;
     }
     
+    console.log('Inicjalizuję bazę danych...');
     const db = await initDB();
     const tx = db.transaction('transactions', 'readwrite');
     const store = tx.objectStore('transactions');
     
+    console.log('Pobieranie transakcji z bazy...');
     return new Promise((resolve, reject) => {
       const request = store.get(transactionId);
       
       request.onsuccess = async () => {
         const transaction = request.result;
+        console.log('Pobrana transakcja:', transaction);
         
-        // Sprawdź czy transakcja należy do zalogowanego użytkownika
-        if (transaction && transaction.userId === parseInt(userId)) {
+        // Sprawdź czy transakcja istnieje
+        if (!transaction) {
+          console.error('Nie znaleziono transakcji o ID:', transactionId);
+          showMessage('error', 'Nie znaleziono transakcji');
+          resolve(false);
+          return;
+        }
+      
+        if (transaction.userId === userId) {
+          console.log('Usuwam transakcję lokalnie...');
           // Usuń lokalnie
           const deleteRequest = store.delete(transactionId);
           
           deleteRequest.onsuccess = async () => {
-            // Jeśli transakcja była już zsynchronizowana, oznacz do usunięcia na serwerze
-            if (transaction.synced === 1) {
-              // Dodaj do kolejki usunięć
-              addToDeleteQueue(transactionId);
+            console.log('Transakcja usunięta lokalnie');
+            
+            // Sprawdź, czy jesteśmy online
+            const online = await isOnline();
+            console.log('Status online:', online);
+            
+            if (online && transaction.synced === 1) {
+              // Jeśli jesteśmy online i transakcja była zsynchronizowana, 
+              // wyślij żądanie usunięcia na serwer
+              try {
+                const token = localStorage.getItem('authToken');
+                if (token) {
+                  const response = await fetch(`${API_URL}/transactions/${transactionId}`, {
+                    method: 'DELETE',
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json'
+                    }
+                  });
+                  
+                  if (response.ok) {
+                    console.log(`Transaction ${transactionId} deleted from server`);
+                  } else {
+                    console.error(`Failed to delete transaction ${transactionId} from server`);
+                    // Dodaj do kolejki usunięć, jeśli nie udało się usunąć z serwera
+                    await addToDeleteQueue(transactionId);
+                  }
+                }
+              } catch (error) {
+                console.error('Error deleting from server:', error);
+                // Dodaj do kolejki usunięć w przypadku błędu
+                await addToDeleteQueue(transactionId);
+              }
+            } else if (transaction.synced === 1) {
+              // Jeśli jesteśmy offline, ale transakcja była zsynchronizowana,
+              // dodaj do kolejki usunięć
+              console.log('Dodaję transakcję do kolejki usunięć...');
+              await addToDeleteQueue(transactionId);
             }
             
             showMessage('success', 'Transakcja została usunięta');
-            loadTransactions(); // Odśwież listę
+            
+            // Odśwież listę
+            loadTransactions(); 
             
             // Aktualizuj wyświetlane saldo
             await updateDisplayedBalance();
@@ -55,19 +106,20 @@ async function deleteTransaction(transactionId) {
             resolve(true);
           };
           
-          deleteRequest.onerror = () => {
-            console.error('Error deleting transaction:', deleteRequest.error);
-            reject(deleteRequest.error);
+          deleteRequest.onerror = (event) => {
+            console.error('Error deleting transaction:', event.target.error);
+            reject(event.target.error);
           };
         } else {
+          console.error('Brak uprawnień do usunięcia transakcji');
           showMessage('error', 'Nie masz uprawnień do usunięcia tej transakcji');
           resolve(false);
         }
       };
       
-      request.onerror = () => {
-        console.error('Error getting transaction for deletion:', request.error);
-        reject(request.error);
+      request.onerror = (event) => {
+        console.error('Error getting transaction for deletion:', event.target.error);
+        reject(event.target.error);
       };
     });
   } catch (error) {
@@ -79,26 +131,76 @@ async function deleteTransaction(transactionId) {
 
 // Funkcja do dodawania usuniętych transakcji do kolejki usunięć
 async function addToDeleteQueue(transactionId) {
+  console.log('Dodaję transakcję do kolejki usunięć:', transactionId);
   try {
     const db = await initDB();
+    
+    // Sprawdź, czy obiekt store 'deleteQueue' istnieje
+    if (!db.objectStoreNames.contains('deleteQueue')) {
+      console.error('Obiekt store "deleteQueue" nie istnieje!');
+      return false;
+    }
+    
     const tx = db.transaction('deleteQueue', 'readwrite');
     const store = tx.objectStore('deleteQueue');
     
-    return new Promise((resolve, reject) => {
-      const request = store.add({
-        type: 'transaction',
-        itemId: transactionId,
-        timestamp: Date.now()
+    // Sprawdź, czy indeks 'itemId' istnieje
+    if (!store.indexNames.contains('itemId')) {
+      console.error('Indeks "itemId" nie istnieje w obiekcie store "deleteQueue"!');
+      // Dodaj element bez sprawdzania duplikatów
+      return new Promise((resolve, reject) => {
+        const request = store.add({
+          type: 'transaction',
+          itemId: transactionId,
+          timestamp: Date.now()
+        });
+        
+        request.onsuccess = () => {
+          console.log(`Added transaction ${transactionId} to delete queue`);
+          resolve(true);
+        };
+        
+        request.onerror = (event) => {
+          console.error('Error adding to delete queue:', event.target.error);
+          reject(event.target.error);
+        };
       });
+    }
+    
+    return new Promise((resolve, reject) => {
+      // Sprawdź, czy transakcja już istnieje w kolejce
+      const index = store.index('itemId');
+      const checkRequest = index.getAll(transactionId);
       
-      request.onsuccess = () => {
-        console.log(`Added transaction ${transactionId} to delete queue`);
-        resolve(true);
+      checkRequest.onsuccess = (event) => {
+        const existingItems = event.target.result;
+        if (existingItems && existingItems.length > 0) {
+          console.log(`Transaction ${transactionId} already in delete queue`);
+          resolve(true);
+          return;
+        }
+        
+        // Dodaj do kolejki usunięć
+        const request = store.add({
+          type: 'transaction',
+          itemId: transactionId,
+          timestamp: Date.now()
+        });
+        
+        request.onsuccess = () => {
+          console.log(`Added transaction ${transactionId} to delete queue`);
+          resolve(true);
+        };
+        
+        request.onerror = (event) => {
+          console.error('Error adding to delete queue:', event.target.error);
+          reject(event.target.error);
+        };
       };
       
-      request.onerror = () => {
-        console.error('Error adding to delete queue:', request.error);
-        reject(request.error);
+      checkRequest.onerror = (event) => {
+        console.error('Error checking delete queue:', event.target.error);
+        reject(event.target.error);
       };
     });
   } catch (error) {
@@ -424,9 +526,24 @@ function displayTransactions(transactions) {
   const deleteButtons = document.querySelectorAll('.btn-delete');
   deleteButtons.forEach(button => {
     button.addEventListener('click', async (e) => {
-      const id = parseInt(e.target.dataset.id);
+      const id = e.target.dataset.id;
+      console.log('Próba usunięcia transakcji o ID:', id);
+      
       if (confirm('Czy na pewno chcesz usunąć tę transakcję?')) {
-        await deleteTransaction(id);
+        console.log('Usuwanie transakcji o ID:', id);
+        try {
+          const result = await deleteTransaction(id);
+          console.log('Wynik usuwania:', result);
+          
+          if (result) {
+            showMessage('success', 'Transakcja została usunięta');
+            // Odśwież listę transakcji
+            loadTransactions();
+          }
+        } catch (error) {
+          console.error('Błąd podczas usuwania transakcji:', error);
+          showMessage('error', `Błąd: ${error.message}`);
+        }
       }
     });
   });
@@ -524,8 +641,9 @@ async function addNewTransaction(event) {
 }
 
 // Funkcja do aktualizacji wyświetlanego salda
-async function updateDisplayedBalance() {
+export async function updateDisplayedBalance() {
   try {
+    // Pobierz aktualne saldo
     const balanceResult = await getCurrentBalance();
     
     if (balanceResult.success) {
@@ -542,21 +660,6 @@ async function updateDisplayedBalance() {
         } else {
           balanceElement.classList.add('positive');
           balanceElement.classList.remove('negative');
-        }
-        
-        // Jeśli są niezesynchronizowane transakcje, dodaj informację
-        if (Math.abs(balanceResult.offlineBalance) > 0.001) {
-          const offlineInfo = document.createElement('div');
-          offlineInfo.className = 'offline-balance-info';
-          offlineInfo.textContent = `(w tym niezesynchronizowane: ${balanceResult.offlineBalance.toFixed(2)} zł)`;
-          
-          // Usuń poprzednią informację, jeśli istnieje
-          const existingInfo = balanceElement.querySelector('.offline-balance-info');
-          if (existingInfo) {
-            existingInfo.remove();
-          }
-          
-          balanceElement.appendChild(offlineInfo);
         }
       }
     }

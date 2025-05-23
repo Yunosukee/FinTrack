@@ -1,5 +1,6 @@
 import { getOfflineTransactions, markTransactionsSynced, initDB } from './db.js';
 import { isOnline } from './auth.js';
+import { updateDisplayedBalance } from './transactions.js';
 
 // Bazowy URL API
 const API_URL = 'http://localhost:3000/api';
@@ -128,17 +129,20 @@ export async function syncData() {
     // 2. PUSH - Wyślij lokalne zmiany na serwer
     console.log('STEP 2: Pushing local changes to server...');
     await pushToServer(token);
-
-    // 3. PULL - Pobierz nowe dane z serwera
-    const newSyncTimestamp = Date.now();
-    console.log('STEP 1: Pulling data from server...');
-    await pullFromServer(newSyncTimestamp, token);
+    
+    // 3. PROCESS DELETE QUEUE - Przetwórz kolejkę usunięć
+    console.log('STEP 3: Processing delete queue...');
+    const deleteResult = await processDeleteQueue();
+    console.log(`Delete queue processed: ${deleteResult.deleted} items deleted, ${deleteResult.errors} errors`);
     
     // 4. Aktualizuj timestamp synchronizacji
     const newTimestamp = Date.now();
     localStorage.setItem('lastSyncTimestamp', newTimestamp);
     localStorage.setItem('lastSuccessfulSync', newTimestamp);
     console.log(`Synchronization completed. New timestamp: ${newTimestamp}`);
+    
+    // 5. Aktualizuj wyświetlane saldo
+    await updateDisplayedBalance();
     
     return { success: true, timestamp: newTimestamp };
   } catch (error) {
@@ -276,5 +280,104 @@ async function pushToServer(token) {
   } catch (error) {
     console.error('Error during push to server:', error);
     throw error;
+  }
+}
+
+// Funkcja do przetwarzania kolejki usunięć
+async function processDeleteQueue() {
+  try {
+    const db = await initDB();
+    const tx = db.transaction('deleteQueue', 'readonly');
+    const store = tx.objectStore('deleteQueue');
+    
+    return new Promise((resolve, reject) => {
+      const request = store.getAll();
+      
+      request.onsuccess = async () => {
+        const deleteQueue = request.result;
+        console.log(`Found ${deleteQueue.length} items in delete queue`);
+        
+        if (deleteQueue.length === 0) {
+          resolve({ success: true, deleted: 0 });
+          return;
+        }
+        
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          resolve({ success: false, message: 'Nie jesteś zalogowany' });
+          return;
+        }
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        // Przetwórz każdy element kolejki
+        for (const item of deleteQueue) {
+          if (item.type === 'transaction') {
+            try {
+              const response = await fetch(`${API_URL}/transactions/${item.itemId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (response.ok) {
+                // Usuń z kolejki po pomyślnym usunięciu z serwera
+                await removeFromDeleteQueue(item.itemId);
+                successCount++;
+              } else {
+                console.error(`Failed to delete transaction ${item.itemId} from server`);
+                errorCount++;
+              }
+            } catch (error) {
+              console.error(`Error deleting transaction ${item.itemId}:`, error);
+              errorCount++;
+            }
+          }
+        }
+        
+        resolve({ 
+          success: true, 
+          deleted: successCount, 
+          errors: errorCount 
+        });
+      };
+      
+      request.onerror = () => {
+        console.error('Error getting delete queue:', request.error);
+        reject(request.error);
+      };
+    });
+  } catch (error) {
+    console.error('Error processing delete queue:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+// Funkcja do usuwania elementu z kolejki usunięć
+async function removeFromDeleteQueue(queueItemId) {
+  try {
+    const db = await initDB();
+    const tx = db.transaction('deleteQueue', 'readwrite');
+    const store = tx.objectStore('deleteQueue');
+    
+    return new Promise((resolve, reject) => {
+      const request = store.delete(queueItemId);
+      
+      request.onsuccess = () => {
+        console.log(`Removed item ${queueItemId} from delete queue`);
+        resolve(true);
+      };
+      
+      request.onerror = () => {
+        console.error('Error removing from delete queue:', request.error);
+        reject(request.error);
+      };
+    });
+  } catch (error) {
+    console.error('Error removing from delete queue:', error);
+    return false;
   }
 }
